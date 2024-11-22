@@ -28,10 +28,23 @@ class GameServer:
                     data = conn.recv(4096)
                     if not data:
                         break
-                    data = pickle.loads(data)
+                    # Packet loss detection and recovery exception handling
+                    try:
+                        data = pickle.loads(data)
+                    except (pickle.UnpicklingError, EOFError):
+                        print(f"Packet loss detected from {addr}. Ignoring corrupt data.")
+                        continue  # Ignore the data and process the next packet
+
                     self.update_game_state(conn, data, room_id)
-                except (EOFError, ConnectionResetError):
+                except (ConnectionResetError, BrokenPipeError):
+                    # Client disconnection exception handling
+                    print(f"Connection lost with {addr}. Handling disconnection.")
                     break
+                except socket.timeout:
+                    # Client response timeout exception handling
+                    print(f"Timeout from {addr}. Client may have high latency.")
+                    continue  # Wait again when timeout occurs
+
         finally:
             self.disconnect_client(conn, addr, room_id)
 
@@ -54,6 +67,7 @@ class GameServer:
             try:
                 client.send(pickle.dumps(game_state))
             except (socket.error, ConnectionResetError):
+                print("Failed to send data to a client. Removing the client.")
                 self.disconnect_client(client)
 
 
@@ -69,13 +83,19 @@ class GameServer:
     def start(self):
         while True:
             conn, addr = self.server.accept()
+            conn.settimeout(10)  # Set client response latency
             conn.send(pickle.dumps({"rooms": list(self.rooms.keys())}))
             room_id = pickle.loads(conn.recv(4096)).get("room_id", 0)
-            if room_id in self.rooms:
-                self.rooms[room_id].append(conn)
-                thread = threading.Thread(target=self.handle_client, args=(conn, addr, room_id))
-                thread.start()
-            else:
+            try:
+                if room_id in self.rooms:
+                    self.rooms[room_id].append(conn)
+                    thread = threading.Thread(target=self.handle_client, args=(conn, addr, room_id))
+                    thread.start()
+                else:
+                    conn.close()
+            except (EOFError, pickle.UnpicklingError):
+                # Initial data processing failure exception handling
+                print(f"Invalid data received from {addr}. Closing connection.")
                 conn.close()
 
 if __name__ == "__main__":
