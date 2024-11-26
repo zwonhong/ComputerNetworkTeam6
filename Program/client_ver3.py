@@ -9,7 +9,7 @@ pygame.init()
 WHITE = (255, 255, 255)  # 화면 배경색 🎨
 RED = (255, 0, 0)        # 사과 색 🍎
 GREEN = (0, 255, 0)      # 뱀 색 🐍
-size = [400, 400]        # 화면 크기 설정 📏
+size = [400, 440]        # 화면 크기 설정 (점수 영역 포함) 📏
 screen = pygame.display.set_mode(size)  # 게임 창 생성
 pygame.display.set_caption("Multiplayer Snake Game")  # 게임 제목 설정 🌟
 FONT = pygame.font.Font(None, 36)  # 점수 표시 폰트 🎨
@@ -29,7 +29,7 @@ class SnakeClient:
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # 서버와 연결할 소켓 생성 📡
         self.client.connect((host, port))  # 서버 연결 🔗
         self.running = True  # 게임 실행 여부 🌟
-        self.snake = [(random.randint(0, 19), random.randint(0, 19))]  # 뱀 초기 위치 설정 🐍
+        self.snake = [(random.randint(1, 19), random.randint(0, 19))]  # 뱀 초기 위치 설정 (점수 영역 제외) 🐍
         self.score = 0  # 점수 초기화 🎯
         self.top_score = 0  # 최고 점수 초기화 🏆
 
@@ -72,14 +72,14 @@ class SnakeClient:
 # 사과 클래스 🍎
 class Apple:
     def __init__(self):
-        self.position = (random.randint(0, 19), random.randint(0, 19))  # 사과 위치 랜덤 생성
+        self.position = (random.randint(1, 19), random.randint(0, 19))  # 사과 위치 랜덤 생성 (점수 영역 제외)
 
     def draw(self):
         draw_block(screen, RED, self.position)  # 사과 화면에 그리기
 
 # 블록 그리는 함수 🎨
 def draw_block(screen, color, position):
-    block = pygame.Rect((position[1] * 20, position[0] * 20), (20, 20))  # 블록 크기와 위치
+    block = pygame.Rect((position[1] * 20, position[0] * 20 + 40), (20, 20))  # 블록 크기와 위치 (점수 영역 하단부터 시작)
     pygame.draw.rect(screen, color, block)  # 화면에 블록 그리기
 
 # 메인 게임 함수 🎮
@@ -92,6 +92,10 @@ def main():
 
     while running:
         screen.fill(WHITE)  # 화면 초기화 🎨
+
+        # 점수 표시 영역 배경 그리기 🎯
+        pygame.draw.rect(screen, (200, 200, 200), (0, 0, size[0], 40))
+
         for event in pygame.event.get():  # 이벤트 처리
             if event.type == pygame.QUIT:  # 게임 종료 이벤트
                 running = False
@@ -112,7 +116,7 @@ def main():
             new_head = (head_y, head_x + 1)
 
         # 벽을 넘어가면 반대편으로 이동 🚧➡️⬅️
-        new_head = (new_head[0] % (size[1] // 20), new_head[1] % (size[0] // 20))
+        new_head = (new_head[0] % 20, new_head[1] % 20)
 
         # 뱀이 사과 먹기 🍎🐍
         if new_head == apple.position:
@@ -133,14 +137,14 @@ def main():
 
         # 뱀과 사과 그리기 🐍🍎
         for segment in snake_body:
-            pygame.draw.rect(screen, GREEN, (segment[1] * 20, segment[0] * 20, 20, 20))
+            pygame.draw.rect(screen, GREEN, (segment[1] * 20, segment[0] * 20 + 40, 20, 20))
         apple.draw()
 
         # 점수 표시 🎯
         score_text = FONT.render(f"Your Score: {client.score}", True, (0, 0, 0))
         top_score_text = FONT.render(f"Top Score: {client.top_score}", True, (0, 0, 0))
-        screen.blit(score_text, (10, 10))
-        screen.blit(top_score_text, (10, 50))
+        screen.blit(score_text, (10, 5))
+        screen.blit(top_score_text, (200, 5))
 
         pygame.display.update()  # 화면 업데이트 🌟
         clock.tick(10)  # 게임 속도 설정 ⏰
